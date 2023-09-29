@@ -1,28 +1,117 @@
 ---
-title: ""
-author: ""
+title: "Lab 6"
+author: "Allison Louie"
 format:
   html:
     embed-resources: true
 ---
-
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
 ```{r}
-1 + 1
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(tidytext)
+library(knitr)
+library(dplyr)
+download.file("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/00_mtsamples/mtsamples.csv",
+  destfile = file.path("~", "Downloads", "mtsamples.csv"),
+  method   = "libcurl",
+  timeout  = 60
+)
+
+mtsample <- data.table::fread(file.path("~", "Downloads", "mtsamples.csv"))
 ```
 
-You can add options to executable code like this
+## Question 1
 
 ```{r}
-#| echo: false
-2 * 2
+names(mtsample) <- c("#", "Description", "Medical_Specialty", "Sample Name", "Transcription", "Keywords")
+mtsample <- mtsample[-1, ]
+mtsample %>%
+  count(Medical_Specialty)
+```
+There appears to be 40 categories.  I do not think they seem to overlap.
+
+## Question 2
+```{r}
+mtsample %>%
+  unnest_tokens(token, Transcription) %>%
+  count(token, sort = TRUE) %>%
+  top_n(20, n)%>%
+  ggplot(aes(n, token)) +
+  geom_col()
+```
+It does not seem completely correct since it only picks out the key words of what was reused rather than the conditions of what we want to look for.  It is hard to see the insights for the diagnoses.
+
+## Question 3
+```{r}
+mtsample %>%
+  unnest_tokens(token, Transcription) %>%
+  anti_join(stop_words, by = c("token" = "word")) %>%
+  filter(!grepl("^\\d+$", token)) %>%
+count(token, sort = TRUE) %>%
+  top_n(20, n)%>%
+  ggplot(aes(n, token)) +
+  geom_col()
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Question 4
+```{r}
+mtsample %>%
+  unnest_ngrams(ngram, Transcription, n = 2) %>%
+  count(ngram, sort = TRUE)
+```
+``` {r}
+mtsample %>%
+  unnest_ngrams(ngram, Transcription, n = 3) %>%
+  count(ngram, sort = TRUE)
+```
+Trigrams have a little more context with the statements reused throughout the data rather than the bigrams.
+
+## Question 5
+```{r}
+mtsample %>%
+  unnest_ngrams(ngram, Transcription, n = 2) %>%
+  separate(ngram, into = c("word1", "word2"), sep = " ") %>%
+  select(word1, word2)%>%
+  filter(word2 == "surgery") %>%
+  count(word1, sort = TRUE)
+```
+
+```{r}
+mtsample %>%
+  unnest_ngrams(ngram, Transcription, n = 2) %>%
+  separate(ngram, into = c("word1", "word2"), sep = " ") %>%
+  select(word1, word2)%>%
+  filter(word1 == "surgery") %>%
+  count(word2, sort = TRUE)
+```
+
+## Question 6
+```{r}
+tokenized_data <- mtsample %>%
+  unnest_tokens(token, Transcription)%>%
+  anti_join(stop_words, by = c("token" = "word"))%>%
+  filter(!grepl("^\\d+$", token))
+tokenized_data %>%
+  anti_join(stop_words, by = c("token" = "word"))%>%
+  filter(!grepl("^\\d+$", token))
+top_words_by_specialty <- tokenized_data %>%
+  group_by(Medical_Specialty, token) %>%
+  count(sort = TRUE) %>%
+  anti_join(stop_words, by = c("token" = "word")) %>%
+  filter(!grepl("^\\d+$", token))%>%
+  group_by(Medical_Specialty) %>%
+  top_n(5, n)
+top_words_by_specialty
+```
+
+## Question 7
+```{r}
+mtsample %>%
+  unnest_ngrams(ngram, Transcription, n = 3) %>%
+  separate(ngram, into = c("word1", "word2", "word3"), sep = " ") %>%
+  select(word1, word2, word3)%>%
+  filter(word1 == "bladder") %>%
+  count(word2, word3, sort = TRUE)
+```
+I wanted to see if there were any specific issues relating to the bladder but most of them used in a trigram were using it in a sentence as to what was being performed on it rather than the named issue itself.
