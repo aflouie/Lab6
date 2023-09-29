@@ -12,13 +12,15 @@ library(tidyr)
 library(tidytext)
 library(knitr)
 library(dplyr)
-download.file("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/00_mtsamples/mtsamples.csv",
-  destfile = file.path("~", "Downloads", "mtsamples.csv"),
-  method   = "libcurl",
-  timeout  = 60
-)
 
-mtsample <- data.table::fread(file.path("~", "Downloads", "mtsamples.csv"))
+if (!file.exists("mtsamples.csv"))
+    download.file(
+      url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/00_mtsamples/mtsamples.csv",
+      destfile = "mtsamples.csv",
+      method   = "libcurl",
+      timeout  = 60
+    )
+mtsample <- data.table::fread(file.path("mtsamples.csv"))
 ```
 
 ## Question 1
